@@ -1,4 +1,4 @@
-# CIFAR-10 Image Classification Project
+# CIFAR-10 Image Classifier
 
 This project implements a custom CNN architecture for classifying images from the CIFAR-10 dataset using PyTorch.
 
