@@ -1,0 +1,18 @@
+training:
+  batch_size: 64
+  num_epochs: 20
+  learning_rate: 0.001
+  save_freq: 5
+  print_freq: 100
+
+model:
+  num_classes: 10
+  checkpoint_file: 'cifar10_model.pth'
+
+paths:
+  checkpoint_dir: 'checkpoints'
+  data_dir: 'data'
+  logs_dir: 'logs'
+
+metrics:
+  target_accuracy: 85.0
