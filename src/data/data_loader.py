@@ -1,5 +1,4 @@
 import torchvision
-import torchvision.transforms as transforms
 from torch.utils.data import DataLoader, Dataset
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
@@ -15,9 +14,6 @@ class AlbumentationsDataset(Dataset):
         img, label = self.dataset[idx]
         img = np.array(img)  # Convert PIL image to numpy array
 
-        # Convert to float and normalize to [0, 1] range
-        img = img.astype(np.float32) / 255.0
-
         if self.transform:
             transformed = self.transform(image=img)
             img = transformed["image"]
@@ -27,48 +23,77 @@ class AlbumentationsDataset(Dataset):
     def __len__(self):
         return len(self.dataset)
 
-def get_transforms(mean):
-    return A.Compose([
-        A.HorizontalFlip(p=0.5),
-        A.ShiftScaleRotate(shift_limit=0.1, scale_limit=0.1, rotate_limit=15, p=0.5),
-        A.CoarseDropout(max_holes=1, max_height=16, max_width=16,
-                        min_holes=1, min_height=16, min_width=16,
-                        fill_value=mean.tolist(), mask_fill_value=None, p=0.5),
-        ToTensorV2()
-    ])
+def get_transforms(mean, std, is_train=True):
+    if is_train:
+        return A.Compose([
+            A.HorizontalFlip(p=0.5),
+            A.ShiftScaleRotate(shift_limit=0.1, scale_limit=0.1, rotate_limit=15, p=0.5),
+            A.CoarseDropout(
+                max_holes=1, max_height=16, max_width=16,
+                min_holes=1, min_height=16, min_width=16,
+                fill_value=[x * 255 for x in mean], p=0.5
+            ),
+            A.Normalize(mean=mean, std=std),
+            ToTensorV2()
+        ])
+    else:
+        return A.Compose([
+            A.Normalize(mean=mean, std=std),
+            ToTensorV2()
+        ])
 
 def load_data():
-    # Initial dataset to calculate mean and std
-    initial_dataset = torchvision.datasets.CIFAR10(root=config.DATA_DIR, train=True, download=True)
-
-    # Calculate mean and std on the fly
+    # Calculate mean and std
+    initial_dataset = torchvision.datasets.CIFAR10(
+        root=config.DATA_DIR, train=True, download=True
+    )
+    
     mean = np.zeros(3)
     std = np.zeros(3)
-    total_images = 0
-
     for img, _ in initial_dataset:
         img = np.array(img) / 255.0
         mean += img.mean(axis=(0, 1))
         std += img.std(axis=(0, 1))
-        total_images += 1
-
-    mean /= total_images
-    std /= total_images
-
+    
+    mean /= len(initial_dataset)
+    std /= len(initial_dataset)
+    
     print("Calculated Mean:", mean)
     print("Calculated Std:", std)
 
-    transform = get_transforms(mean)
+    # Create transforms with proper normalization
+    train_transform = get_transforms(mean, std, is_train=True)
+    test_transform = get_transforms(mean, std, is_train=False)
 
-    # Create base datasets
-    train_dataset_base = torchvision.datasets.CIFAR10(root=config.DATA_DIR, train=True, download=True)
-    test_dataset_base = torchvision.datasets.CIFAR10(root=config.DATA_DIR, train=False, download=True)
+    # Create datasets
+    train_dataset_base = torchvision.datasets.CIFAR10(
+        root=config.DATA_DIR, train=True, download=True
+    )
+    test_dataset_base = torchvision.datasets.CIFAR10(
+        root=config.DATA_DIR, train=False, download=True
+    )
 
-    # Wrap with Albumentations dataset
-    train_dataset = AlbumentationsDataset(train_dataset_base, transform=transform)
-    test_dataset = AlbumentationsDataset(test_dataset_base, transform=transform)
+    # Wrap with Albumentations
+    train_dataset = AlbumentationsDataset(train_dataset_base, transform=train_transform)
+    test_dataset = AlbumentationsDataset(test_dataset_base, transform=test_transform)
 
-    train_loader = DataLoader(train_dataset, batch_size=config.BATCH_SIZE, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=config.BATCH_SIZE, shuffle=False)
+    # Create data loaders with proper batch size from config
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=config.BATCH_SIZE,  # Use uppercase config attributes
+        shuffle=True,
+        num_workers=2,
+        pin_memory=True,
+        drop_last=True
+    )
+    
+    test_loader = DataLoader(
+        test_dataset,
+        batch_size=config.BATCH_SIZE,  # Use uppercase config attributes
+        shuffle=False,
+        num_workers=2,
+        pin_memory=True,
+        drop_last=False
+    )
 
     return train_loader, test_loader

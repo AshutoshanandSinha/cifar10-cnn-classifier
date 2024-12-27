@@ -11,30 +11,28 @@ from src.models import CustomCNN
 from src.training import Trainer
 from src.utils.config import config
 from src.utils import setup_directories
+from src.utils.model_analysis import analyze_model
 
 def main():
     # Setup directories
     setup_directories()
-
+    
+    # Initialize model (let Trainer handle device placement)
+    model = CustomCNN()
+    
+    # Analyze model architecture
+    analyze_model(model)
+    
     # Load data
     train_loader, test_loader = load_data()
-
-    # Initialize model, criterion, optimizer
-    model = CustomCNN()
+    
+    # Initialize criterion, optimizer
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=config.LEARNING_RATE)
-
+    
     # Create trainer and start training
     trainer = Trainer(model, train_loader, test_loader, criterion, optimizer)
     trainer.train()
-
-    for epoch in range(config.NUM_EPOCHS):
-        # ... epoch code ...
-        if epoch % config.SAVE_FREQ == 0:
-            save_checkpoint(...)
-
-        if epoch % config.PRINT_FREQ == 0:
-            print(f"Epoch [{epoch}/{config.NUM_EPOCHS}]...")
 
 if __name__ == "__main__":
     main()

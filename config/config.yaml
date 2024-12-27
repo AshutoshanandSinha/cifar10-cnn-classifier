@@ -1,13 +1,15 @@
 training:
   batch_size: 64
-  num_epochs: 20
-  learning_rate: 0.001
+  num_epochs: 50
+  learning_rate: 0.01
+  weight_decay: 1e-4
   save_freq: 5
   print_freq: 100
 
 model:
   num_classes: 10
   checkpoint_file: 'cifar10_model.pth'
+  dropout_rate: 0.1
 
 paths:
   checkpoint_dir: 'checkpoints'

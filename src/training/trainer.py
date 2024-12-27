@@ -4,18 +4,40 @@ from pathlib import Path
 from ..utils.config import config
 from ..utils import save_checkpoint
 from .evaluator import Evaluator
+from ..utils.visualization import plot_training_history
+from tqdm import tqdm
+from torch.optim.lr_scheduler import OneCycleLR
 
 class Trainer:
     def __init__(self, model, train_loader, test_loader, criterion, optimizer):
-        self.model = model.to(config.DEVICE)
+        self.device = config.DEVICE
+        self.model = model.to(self.device)
         self.train_loader = train_loader
         self.test_loader = test_loader
         self.criterion = criterion
         self.optimizer = optimizer
+        self.target_accuracy = config.TARGET_ACCURACY
         self.best_accuracy = 0.0
-        self.target_accuracy = 90.0  # You can adjust this or get from config
-        self.evaluator = Evaluator(model, test_loader, criterion)
-        self._setup_logging()
+        
+        # Initialize lists to store metrics
+        self.train_losses = []
+        self.val_losses = []
+        self.train_accuracies = []
+        self.val_accuracies = []
+        
+        # Create evaluator with model on correct device
+        self.evaluator = Evaluator(self.model, test_loader, criterion)
+        
+        # Add scheduler
+        self.scheduler = OneCycleLR(
+            optimizer,
+            max_lr=config.LEARNING_RATE,
+            epochs=config.NUM_EPOCHS,
+            steps_per_epoch=len(train_loader),
+            pct_start=0.3,
+            div_factor=10,
+            final_div_factor=100
+        )
 
     def _setup_logging(self):
         logging.basicConfig(
@@ -31,26 +53,46 @@ class Trainer:
     def train_epoch(self, epoch):
         self.model.train()
         running_loss = 0.0
-
-        for i, (images, labels) in enumerate(self.train_loader):
-            images = images.to(config.DEVICE)
-            labels = labels.to(config.DEVICE)
-
+        correct = 0
+        total = 0
+        
+        pbar = tqdm(self.train_loader, desc=f'Epoch {epoch+1}', 
+                   unit='batch', leave=False)
+        
+        for batch_idx, (data, target) in enumerate(pbar):
+            # Ensure data and target are on the same device
+            data = data.to(self.device)
+            target = target.to(self.device)
+            
+            # Zero the parameter gradients
             self.optimizer.zero_grad()
-            outputs = self.model(images)
-            loss = self.criterion(outputs, labels)
+            
+            # Forward pass
+            outputs = self.model(data)
+            loss = self.criterion(outputs, target)
+            
+            # Backward pass and optimize
             loss.backward()
             self.optimizer.step()
-
+            self.scheduler.step()
+            
+            # Statistics
             running_loss += loss.item()
-
-            if (i + 1) % config.PRINT_FREQ == 0:
-                msg = f'Epoch [{epoch+1}/{config.NUM_EPOCHS}], Step [{i+1}/{len(self.train_loader)}], Loss: {running_loss/config.PRINT_FREQ:.4f}'
-                print(msg)
-                logging.info(msg)
-                running_loss = 0.0
-
-        return running_loss / len(self.train_loader)
+            _, predicted = outputs.max(1)
+            total += target.size(0)
+            correct += predicted.eq(target).sum().item()
+            
+            # Update progress bar
+            current_lr = self.scheduler.get_last_lr()[0]
+            pbar.set_postfix({
+                'loss': f'{running_loss/(batch_idx+1):.4f}',
+                'acc': f'{100.*correct/total:.2f}%',
+                'lr': f'{current_lr:.6f}'
+            })
+        
+        epoch_loss = running_loss / len(self.train_loader)
+        epoch_accuracy = 100. * correct / total
+        return epoch_loss, epoch_accuracy
 
     def train(self):
         print(f"\nStarting training for {config.NUM_EPOCHS} epochs...")
@@ -58,11 +100,15 @@ class Trainer:
 
         for epoch in range(config.NUM_EPOCHS):
             # Training phase
-            train_loss = self.train_epoch(epoch)
-
+            train_loss, train_accuracy = self.train_epoch(epoch)
+            self.train_losses.append(train_loss)
+            self.train_accuracies.append(train_accuracy)
+            
             # Evaluation phase
             print("\nEvaluating...")
             accuracy, eval_loss = self.evaluator.evaluate()
+            self.val_losses.append(eval_loss)
+            self.val_accuracies.append(accuracy)
 
             # Create progress bars
             accuracy_bar = self._create_progress_bar(min(accuracy, self.target_accuracy), self.target_accuracy)
@@ -79,12 +125,6 @@ class Trainer:
                 msg += f'\n✨ Exceeded target accuracy!'
             elif accuracy > self.best_accuracy:
                 msg += f'\n🎯 New best accuracy!'
-
-            print(msg)
-            logging.info(msg)
-
-            # Save checkpoint if it's the best model
-            if accuracy > self.best_accuracy:
                 self.best_accuracy = accuracy
                 print(f"\nSaving checkpoint...")
                 save_checkpoint(
@@ -95,6 +135,13 @@ class Trainer:
                     accuracy=accuracy
                 )
 
+            # Add plotting at the end
+            if epoch == config.NUM_EPOCHS - 1:
+                self._plot_training_history()
+
+            print(msg)
+            logging.info(msg)
+
         # Final summary
         print("\nTraining Complete!")
         print(f"Final Best Accuracy: {self.best_accuracy:.2f}%")
@@ -102,3 +149,16 @@ class Trainer:
             print("🎉 Successfully reached target accuracy!")
         else:
             print(f"⚠️ Target accuracy not reached. Got {self.best_accuracy:.2f}% vs target {self.target_accuracy}%")
+
+    def _plot_training_history(self):
+        """Plot and save training history."""
+        from ..utils.visualization import plot_training_history
+        
+        plot_training_history(
+            self.train_losses,
+            self.val_losses,
+            self.train_accuracies,
+            self.val_accuracies,
+            self.target_accuracy,
+            save_dir=config.LOGS_DIR
+        )
