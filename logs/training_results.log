@@ -1,0 +1,38 @@
+Model Training Results
+==================================================
+
+Model Architecture Summary:
+--------------------------------------------------
+Total Parameters: 85,034
+Trainable Parameters: 85,034
+Model Size: 0.32 MB
+
+Training Performance:
+--------------------------------------------------
+- Achieved Target Accuracy: Yes (Target: 85.0%)
+- Best Accuracy: 85.57% (Epoch 48)
+- Final Accuracy: 85.49% (Epoch 50)
+- Final Training Loss: 0.5998
+- Final Validation Loss: 0.4239
+
+Training Progress:
+--------------------------------------------------
+- Reached 70% accuracy at epoch 5 (70.54%)
+- Reached 75% accuracy at epoch 11 (74.56%)
+- Reached 80% accuracy at epoch 23 (80.31%)
+- Reached 85% accuracy at epoch 42 (85.09%)
+
+Final Model Metrics:
+--------------------------------------------------
+- Accuracy: 85.49%
+- Loss: 0.4239
+- F1 Score: 0.8549
+- Precision: 0.8549
+- Recall: 0.8549
+
+Model Architecture Details:
+--------------------------------------------------
+- Input Layer: 3 channels
+- 8 Convolutional blocks
+- Global Average Pooling
+- Final Dense Layer: 10 classes 

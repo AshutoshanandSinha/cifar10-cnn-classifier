@@ -29,6 +29,5 @@ ENV/
 .vscode/
 
 # Project specific
-logs/
 checkpoints/
 *.pth

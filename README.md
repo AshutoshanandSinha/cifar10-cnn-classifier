@@ -163,3 +163,32 @@ The model provides detailed analysis including:
 - Forward/backward pass size
 - Total parameter count (~85.6k)
 - Model size in MB (0.33 MB)
+
+## Training Results
+
+### Model Performance
+- **Target Accuracy**: 85.0%
+- **Best Accuracy Achieved**: 85.57%
+- **Final Model Metrics**:
+  - Accuracy: 85.49%
+  - Loss: 0.4239
+  - F1 Score: 0.8549
+  - Precision: 0.8549
+  - Recall: 0.8549
+
+### Training Progress
+The model showed steady improvement throughout training:
+- Reached 70% accuracy by epoch 5
+- Crossed 75% accuracy at epoch 11
+- Achieved 80% accuracy by epoch 23
+- Exceeded target accuracy of 85% at epoch 42
+- Maintained consistent performance above 85% for final epochs
+
+### Model Architecture
+- Total Parameters: 85,034
+- Model Size: 0.32 MB
+- Architecture: Custom CNN with 8 convolutional blocks
+- Final Layer: Global Average Pooling followed by Dense layer
+
+### Training Plots
+Training history plots are saved in `logs/training_history.png`
